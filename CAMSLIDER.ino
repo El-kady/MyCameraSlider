@@ -45,18 +45,19 @@ volatile boolean TurnDetected;
 volatile boolean rotationdirection;
 
 volatile boolean useSensor;
+volatile boolean automatic;
 volatile int layerCount;
 
 int currentStateCLK;
 int lastStateCLK;
+
+int currentText = -1;
 
 void Switch()  
 {
  if(millis()-switch0>50)
  {
   flag=flag+1;
-  Serial.println("flag");
-  Serial.println(flag);
  }
  switch0=millis();
 }
@@ -108,6 +109,7 @@ void setup()
     lastStateCLK = digitalRead(PinCLK);
     useSensor = 1;
     layerCount = 0;
+    automatic = 1;
 
     attachInterrupt(digitalPinToInterrupt(PinSW), Switch, RISING); // SW connected to D2
     attachInterrupt(digitalPinToInterrupt(PinCLK), Rotary, RISING); // CLK Connected to D3
@@ -282,10 +284,33 @@ void loop()
 {
 
     //Begin Setup
-    if (flag == 0) {
+    if (flag == 0 && currentText!=0 ) {
         oled.clear();
-        oled.println("Setup?");
+        oled.println("Mode:");
+        oled.println("Automatic");
+        while (flag == 0) {
+            if (TurnDetected) {
+                TurnDetected = false;
+                automatic = !automatic;
+                oled.clear();
+                oled.println("Mode:");
+                oled.println((automatic == 1) ? "Automatic" : "Manual");                
+            }
+            delay(5);
+        }
+        
         setspeed = 200;
+        currentText = 0;
+    }
+
+    if((flag == 1) && automatic == 1){
+      Serial.print("go to 5");
+      setspeed = 1000;
+      XInPoint = 0;
+      XOutPoint = 27500;
+      YInPoint = 0;
+      YOutPoint = 550;   
+      flag = 5;
     }
 
     //SetXin
@@ -337,15 +362,24 @@ void loop()
         gotoposition[1] = YInPoint;
         oled.clear();
         oled.println("Preview");
+        oled.print("X ");
+        oled.print(XInPoint);
+        oled.print(" ");
+        oled.println(XOutPoint);
+        oled.print("Y ");
+        oled.print(YInPoint);
+        oled.print(" ");
+        oled.println(YOutPoint);
 
         stepper1.setMaxSpeed(3000);
         StepperControl.moveTo(gotoposition);
         StepperControl.runSpeedToPosition();
     }
 
-    if (flag == 5) {
+    if (flag == 5 && currentText !=5) {
         oled.clear();
         oled.println("Set Sensor");
+        currentText = 5;
     }
 
     if (flag == 6) {
@@ -356,9 +390,10 @@ void loop()
             if (TurnDetected) {
                 TurnDetected = false;
                 useSensor = !useSensor;
+                oled.clear();
+                oled.println((useSensor == 1) ? "Yes" : "No");                
             }
-            oled.clear();
-            oled.println((useSensor == 1) ? "Yes" : "No");
+            delay(5);
         }
     }
 
@@ -367,9 +402,10 @@ void loop()
       flag = 9;
     }
 
-    if (flag == 7) {
+    if (flag == 7 && currentText != 7) {
         oled.clear();
         oled.println("Set Layers");
+        currentText = 7;
     }
 
     if (flag == 8) {
@@ -390,9 +426,10 @@ void loop()
     }
 
     //Display Set Speed
-    if (flag == 9) {
+    if (flag == 9 && currentText != 9) {
         oled.clear();
         oled.println("Set Speed");
+        currentText = 9;
     }
     //Change Speed
     if (flag == 10) {
@@ -433,10 +470,10 @@ void loop()
                   currentStep = currentStep + 1;
 
                   oled.clear();
-                  oled.print("Step ");
-                  oled.println(currentStep);
+                  oled.println("Step");
+                  oled.print(currentStep);
                   oled.print(" of ");
-                  oled.print(layerCount);
+                  oled.println(layerCount);
                   
                   gotoposition[0] = XStep * currentStep;
                   gotoposition[1] = YStep * currentStep;
@@ -458,11 +495,10 @@ void loop()
         flag = flag + 1;
     }
     //Slide Finish
-    if (flag == 13) {
+    if (flag == 13 && currentText != 13) {
         oled.clear();
         oled.println("Finish");
-        delay(10);
-
+        currentText = 13;
     }
     //Return to start
     if (flag == 14) {
